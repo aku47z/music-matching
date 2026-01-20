@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MIDI Plagiarism Detector</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>Music Matching System</h1>
+        <p class="subtitle">
+          MIDI Plagiarism Detector using Bipartite Matching
+        </p>
+      </header>
+
+      <main>
+        <form id="analyzeForm" enctype="multipart/form-data">
+          <div class="file-inputs">
+            <!-- Song A -->
+            <div class="file-card">
+              <h3>🎼 Song A</h3>
+              <div class="input-group">
+                <label class="upload-label" for="file_a">
+                  <span class="upload-icon">📁</span>
+                  <span class="upload-text">Upload MIDI File</span>
+                  <input
+                    type="file"
+                    id="file_a"
+                    name="file_a"
+                    accept=".mid,.midi"
+                  />
+                </label>
+                <span id="file_a_name" class="file-name"></span>
+              </div>
+              <div class="divider">
+                <span>or select a sample</span>
+              </div>
+              <div class="input-group">
+                <select id="sample_a" name="sample_a">
+                  <option value="">-- Select Sample --</option>
+                  <!-- Populated by JavaScript -->
+                </select>
+              </div>
+            </div>
+
+            <!-- Song B -->
+            <div class="file-card">
+              <h3>🎼 Song B</h3>
+              <div class="input-group">
+                <label class="upload-label" for="file_b">
+                  <span class="upload-icon">📁</span>
+                  <span class="upload-text">Upload MIDI File</span>
+                  <input
+                    type="file"
+                    id="file_b"
+                    name="file_b"
+                    accept=".mid,.midi"
+                  />
+                </label>
+                <span id="file_b_name" class="file-name"></span>
+              </div>
+              <div class="divider">
+                <span>or select a sample</span>
+              </div>
+              <div class="input-group">
+                <select id="sample_b" name="sample_b">
+                  <option value="">-- Select Sample --</option>
+                  <!-- Populated by JavaScript -->
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <button type="submit" id="analyzeBtn" class="analyze-btn">
+            <span class="btn-text">🔍 Analyze for Plagiarism</span>
+            <span class="btn-loading" style="display: none">
+              <span class="spinner"></span> Analyzing...
+            </span>
+          </button>
+        </form>
+
+        <!-- Results Section -->
+        <div id="results" class="results-section" style="display: none">
+          <h2>Analysis Results</h2>
+
+          <div
+            id="error-message"
+            class="error-message"
+            style="display: none"
+          ></div>
+
+          <div id="results-content">
+            <!-- Score Cards -->
+            <div class="score-cards">
+              <div class="score-card">
+                <div class="score-label">N-Gram Baseline</div>
+                <div class="score-value" id="ngram-score">-</div>
+                <div class="score-bar">
+                  <div class="score-fill" id="ngram-fill"></div>
+                </div>
+              </div>
+              <div class="score-card">
+                <div class="score-label">BMM Score</div>
+                <div class="score-value" id="hook-score">-</div>
+                <div class="score-bar">
+                  <div class="score-fill" id="hook-fill"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Details -->
+            <div class="details-section">
+              <div class="details-grid">
+                <div class="detail-item">
+                  <span class="detail-label">Song A Notes:</span>
+                  <span class="detail-value" id="notes-a">-</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Song B Notes:</span>
+                  <span class="detail-value" id="notes-b">-</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Fragments A:</span>
+                  <span class="detail-value" id="fragments-a">-</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Fragments B:</span>
+                  <span class="detail-value" id="fragments-b">-</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Bipartite Graph Visualization -->
+            <div class="graph-section" id="graph-section" style="display: none">
+              <div class="graph-header">
+                <h3>Bipartite Graph</h3>
+                <button
+                  id="toggle-nodes-btn"
+                  class="toggle-nodes-btn"
+                  title="Toggle between top 15 and all nodes"
+                >
+                  Show All Nodes
+                </button>
+              </div>
+              <div class="graph-container">
+                <img id="graph-image" src="" alt="Bipartite Graph" />
+              </div>
+              <p class="graph-description">
+                <strong>Legend:</strong> All edges are shown in black with
+                opacity and thickness proportional to similarity weight. Thick,
+                opaque edges indicate high similarity; thin, faint edges
+                indicate low similarity. Blue nodes represent Song A fragments,
+                red nodes represent Song B fragments.
+              </p>
+            </div>
+
+            <!-- Top Matches -->
+            <div
+              class="matches-section"
+              id="matches-section"
+              style="display: none"
+            >
+              <h3>Top Matching Segments</h3>
+              <table class="matches-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Similarity</th>
+                    <th>Song A Position</th>
+                    <th>Song B Position</th>
+                  </tr>
+                </thead>
+                <tbody id="matches-tbody"></tbody>
+              </table>
+            </div>
+
+            <!-- Forensic Ranking Mode -->
+            <div
+              class="forensic-section"
+              id="forensic-section"
+              style="display: none"
+            >
+              <div class="forensic-header">
+                <h3>📊 Ranking Mode</h3>
+                <p class="forensic-desc">
+                  Compare Song A against ALL songs in the library to rank by
+                  similarity.
+                </p>
+              </div>
+              <button id="forensic-btn" class="forensic-btn">
+                <span class="btn-text">🔬 Run Forensic Analysis</span>
+                <span class="btn-loading" style="display: none">
+                  <span class="spinner"></span> Analyzing Library...
+                </span>
+              </button>
+
+              <!-- Forensic Results -->
+              <div id="forensic-results" style="display: none">
+                <div class="forensic-summary">
+                  <span id="forensic-summary-text"></span>
+                </div>
+
+                <div class="forensic-verdict" id="forensic-verdict"></div>
+
+                <div class="forensic-table-header">
+                  <h4>Ranked Table</h4>
+                  <button id="toggle-score-btn" class="toggle-score-btn">
+                    Show Segment Scores
+                  </button>
+                </div>
+                <table class="forensic-table">
+                  <thead>
+                    <tr>
+                      <th>Rank</th>
+                      <th>Song Name</th>
+                      <th id="score-header">Overall Score</th>
+                    </tr>
+                  </thead>
+                  <tbody id="forensic-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
