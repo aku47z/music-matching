@@ -7,7 +7,7 @@ from typing import List, Tuple, Set
 from collections import Counter
 
 
-def compute_ngrams(features: List[Tuple[float, float, int]], n: int = 3) -> List[Tuple]:
+def compute_ngrams(features: List[Tuple[float, float, int]], n: int = 5) -> List[Tuple]:
     """
     Generate n-grams from a feature sequence.
     

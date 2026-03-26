@@ -12,11 +12,11 @@ from typing import List, Tuple, Optional
 HIGH_SIMILARITY_THRESHOLD = 0.8
 
 
-def visualize_smoking_gun(
+def visualize_bipartite_graph(
     graph: nx.Graph,
     weight_matrix: np.ndarray,
     top_k_matches: List[Tuple[int, int, float]],
-    title: str = "Smoking Gun Analysis",
+    title: str = "Bipartite Graph Analysis",
     save_path: Optional[str] = None,
     figsize: Tuple[int, int] = (16, 10),
     max_nodes_display: int = 15

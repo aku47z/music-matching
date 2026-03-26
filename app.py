@@ -6,7 +6,6 @@ Flask backend for the web-based plagiarism detector.
 import os
 import tempfile
 import base64
-import numpy as np
 from io import BytesIO
 from flask import Flask, request, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
@@ -16,10 +15,8 @@ from feature_extractor import extract_features_from_midi, features_to_tuples
 from ngram_similarity import compute_baseline_similarity
 from bipartite_matcher import (
     compute_plagiarism_score, 
-    HIGH_SIMILARITY_THRESHOLD,
-    MEDIUM_SIMILARITY_THRESHOLD
 )
-from visualizer import visualize_smoking_gun
+from visualizer import visualize_bipartite_graph
 
 import matplotlib
 matplotlib.use('Agg')
@@ -83,7 +80,6 @@ def analyze_files(path_a, path_b, max_nodes_display=15):
     # Bipartite matching analysis
     result = compute_plagiarism_score(tuples_a, tuples_b, tempo_bpm=120)
     
-    combined_score = result['combined_score']
     hook_score = result['hook_score']
     
     # Top matches
@@ -96,25 +92,11 @@ def analyze_files(path_a, path_b, max_nodes_display=15):
             'time_b': m.time_b
         })
     
-    # Determine verdict
-    if combined_score > 0.7:
-        verdict = 'high'
-        verdict_text = '🚨 HIGH CERTAINTY PLAGIARISM'
-        verdict_desc = 'The structural similarity indicates a very high likelihood of copying.'
-    elif combined_score >= 0.4:
-        verdict = 'medium'
-        verdict_text = '⚖️ SUSPICIOUS / STRUCTURAL SIMILARITY'
-        verdict_desc = 'Significant similar patterns found. Manual review recommended.'
-    else:
-        verdict = 'low'
-        verdict_text = '✅ DISTINCT / ORIGINAL'
-        verdict_desc = 'The melodies appear to be distinct.'
-    
     # Generate bipartite graph visualization
     graph_image = None
     try:
         if result['graph'].number_of_nodes() > 0:
-            fig = visualize_smoking_gun(
+            fig = visualize_bipartite_graph(
                 result['graph'],
                 result['weight_matrix'],
                 result.get('top_k_matches', []),
@@ -136,15 +118,11 @@ def analyze_files(path_a, path_b, max_nodes_display=15):
         'success': True,
         'ngram_score': round(ngram_score, 4),
         'hook_score': round(hook_score, 4),
-        'combined_score': round(combined_score, 4),
         'fragments_a': len(result['fragments_a']),
         'fragments_b': len(result['fragments_b']),
         'notes_a': len(features_a),
         'notes_b': len(features_b),
         'top_matches': top_matches,
-        'verdict': verdict,
-        'verdict_text': verdict_text,
-        'verdict_desc': verdict_desc,
         'graph_image': graph_image
     }
 
@@ -243,7 +221,7 @@ def get_forensic_scores(path_a, path_b):
         # Overall combined score
         overall_score = result.get('combined_score', 0.0)
         
-        # Get the maximum match score (smoking gun motif)
+        # Get the maximum segment match score
         loc_matches = result.get('localized_matches', [])
         if loc_matches:
             max_segment_score = max(m.weight for m in loc_matches)
@@ -270,18 +248,15 @@ def api_forensic():
                 path_a = os.path.join(app.config['UPLOAD_FOLDER'], f"forensic_a_{filename}")
                 file_a.save(path_a)
                 temp_files.append(path_a)
-                song_a_name = file_a.filename
         elif request.form.get('sample_a'):
             sample_name = request.form.get('sample_a')
             path_a = os.path.join(SAMPLES_DIR, sample_name)
-            song_a_name = sample_name
         
         if not path_a or not os.path.exists(path_a):
             return jsonify({'error': 'Query melody (Song A) not found.', 'success': False})
         
         # Handle Song B (Suspect Song)
         suspect_path = None
-        suspect_name = None
         if 'file_b' in request.files and request.files['file_b'].filename:
             file_b = request.files['file_b']
             if allowed_file(file_b.filename):
@@ -289,11 +264,9 @@ def api_forensic():
                 suspect_path = os.path.join(app.config['UPLOAD_FOLDER'], f"forensic_b_{filename}")
                 file_b.save(suspect_path)
                 temp_files.append(suspect_path)
-                suspect_name = file_b.filename
         elif request.form.get('sample_b'):
             sample_name = request.form.get('sample_b')
             suspect_path = os.path.join(SAMPLES_DIR, sample_name)
-            suspect_name = sample_name
         
         if not suspect_path or not os.path.exists(suspect_path):
             return jsonify({'error': 'Suspect song (Song B) not found.', 'success': False})
@@ -323,7 +296,7 @@ def api_forensic():
         # If suspect is an uploaded file (not in samples), add it
         if not suspect_in_samples and suspect_path:
             library.insert(0, {
-                'name': suspect_name,
+                'name': os.path.basename(suspect_path),
                 'path': suspect_path,
                 'is_suspect': True
             })
@@ -356,8 +329,6 @@ def api_forensic():
         
         return jsonify({
             'success': True,
-            'query_song': song_a_name,
-            'suspect_song': suspect_name,
             'rankings': results,
             'total_compared': len(results),
             'suspect_rank': suspect_rank + 1 if suspect_rank >= 0 else -1,

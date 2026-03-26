@@ -1,7 +1,6 @@
 """
 Bipartite Matcher Module
 Core graph-theoretic matching using Maximum Weight Bipartite Matching.
-Includes "Smoking Gun" detection for localized plagiarism analysis.
 """
 
 import numpy as np
@@ -11,20 +10,13 @@ from scipy.optimize import linear_sum_assignment
 from dataclasses import dataclass
 import math
 
-
-# Default window configuration
 DEFAULT_WINDOW_LEN = 10
 DEFAULT_STEP = 5
 
-# BMM-Det Parameters
-SIGMA_SQ = 150.0  # Similarity curve parameter for Euclidean distance
-TOP_K_MATCHES = 10  # Number of top matches for scoring
+SIGMA_SQ = 150.0  
+TOP_K_MATCHES = 10  
 
-# Smoking Gun thresholds
-HIGH_SIMILARITY_THRESHOLD = 0.7
 HIGH_CONFIDENCE_THRESHOLD = 0.7
-MEDIUM_SIMILARITY_THRESHOLD = 0.4
-
 
 @dataclass
 class MatchInfo:
@@ -71,7 +63,7 @@ def align_features_by_motif(
                 # Found match! align from here
                 return feat_a[i:], feat_b[j:]
                 
-    return feat_a, feat_b # No alignment found
+    return feat_a, feat_b
 
 
 def create_fragments(
@@ -120,7 +112,7 @@ def compute_edit_distance(
     pitch_weight: float = 1.0,
     duration_weight: float = 0.3
 ) -> float:
-    """Compute Edit Distance (Levenshtein) with weighted Euclidean feature cost."""
+    """Compute Edit Distance with weighted feature cost."""
     m, n = len(frag_a), len(frag_b)
     
     # Initialize DP table
